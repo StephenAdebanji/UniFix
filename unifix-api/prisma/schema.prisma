@@ -1,0 +1,116 @@
+// UniFix — University Maintenance Request System
+// Prisma schema: users, roles, service requests, categories, assignments, status logs
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RoleName {
+  STUDENT_STAFF
+  MAINTENANCE_OFFICER
+  ADMINISTRATOR
+}
+
+enum RequestStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+}
+
+enum RequestPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Role {
+  id    Int      @id @default(autoincrement())
+  name  RoleName @unique
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  department   String?
+  roleId       Int      @map("role_id")
+  role         Role     @relation(fields: [roleId], references: [id])
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  submittedRequests ServiceRequest[] @relation("SubmittedBy")
+  assignedRequests  Assignment[]     @relation("AssignedOfficer")
+  madeAssignments   Assignment[]     @relation("AssignedBy")
+  statusUpdates     StatusUpdate[]   @relation("UpdatedBy")
+
+  @@map("users")
+}
+
+model RequestCategory {
+  id        Int              @id @default(autoincrement())
+  name      String           @unique
+  requests  ServiceRequest[]
+
+  @@map("request_categories")
+}
+
+model ServiceRequest {
+  id               Int             @id @default(autoincrement())
+  code             String          @unique
+  title            String
+  description      String
+  location         String
+  status           RequestStatus   @default(PENDING)
+  priority         RequestPriority @default(MEDIUM)
+  evidenceFileUrl  String?         @map("evidence_file_url")
+  submittedById    Int             @map("submitted_by")
+  submittedBy      User            @relation("SubmittedBy", fields: [submittedById], references: [id])
+  categoryId       Int             @map("category_id")
+  category         RequestCategory @relation(fields: [categoryId], references: [id])
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  assignments   Assignment[]
+  statusUpdates StatusUpdate[]
+
+  @@map("service_requests")
+}
+
+model Assignment {
+  id                Int            @id @default(autoincrement())
+  requestId         Int            @map("request_id")
+  request           ServiceRequest @relation(fields: [requestId], references: [id])
+  assignedOfficerId Int            @map("assigned_officer_id")
+  assignedOfficer   User           @relation("AssignedOfficer", fields: [assignedOfficerId], references: [id])
+  assignedById      Int            @map("assigned_by")
+  assignedBy        User           @relation("AssignedBy", fields: [assignedById], references: [id])
+  assignedAt        DateTime       @default(now()) @map("assigned_at")
+
+  @@map("assignments")
+}
+
+model StatusUpdate {
+  id          Int            @id @default(autoincrement())
+  requestId   Int            @map("request_id")
+  request     ServiceRequest @relation(fields: [requestId], references: [id])
+  updatedById Int            @map("updated_by")
+  updatedBy   User           @relation("UpdatedBy", fields: [updatedById], references: [id])
+  oldStatus   RequestStatus? @map("old_status")
+  newStatus   RequestStatus  @map("new_status")
+  note        String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  @@map("status_updates")
+}
