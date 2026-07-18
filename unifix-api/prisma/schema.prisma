@@ -51,10 +51,11 @@ model User {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  submittedRequests ServiceRequest[] @relation("SubmittedBy")
-  assignedRequests  Assignment[]     @relation("AssignedOfficer")
-  madeAssignments   Assignment[]     @relation("AssignedBy")
-  statusUpdates     StatusUpdate[]   @relation("UpdatedBy")
+  submittedRequests    ServiceRequest[] @relation("SubmittedBy")
+  currentlyAssigned    ServiceRequest[] @relation("CurrentAssignee")
+  assignedRequests     Assignment[]     @relation("AssignedOfficer")
+  madeAssignments      Assignment[]     @relation("AssignedBy")
+  statusUpdates        StatusUpdate[]   @relation("UpdatedBy")
 
   @@map("users")
 }
@@ -80,6 +81,8 @@ model ServiceRequest {
   submittedBy      User            @relation("SubmittedBy", fields: [submittedById], references: [id])
   categoryId       Int             @map("category_id")
   category         RequestCategory @relation(fields: [categoryId], references: [id])
+  currentAssigneeId Int?           @map("current_assignee_id")
+  currentAssignee   User?          @relation("CurrentAssignee", fields: [currentAssigneeId], references: [id])
   createdAt        DateTime        @default(now()) @map("created_at")
   updatedAt        DateTime        @updatedAt @map("updated_at")
 
