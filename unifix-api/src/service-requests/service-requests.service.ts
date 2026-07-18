@@ -17,6 +17,10 @@ import { QueryServiceRequestsDto } from './dto/query-service-requests.dto';
 import { AssignRequestDto } from './dto/assign-request.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 
+// Neon's serverless compute can cold-start mid-transaction; the Prisma
+// default (5s) interactive-transaction timeout is too tight for that.
+const TRANSACTION_OPTIONS = { timeout: 15000 };
+
 const STATUS_LABELS: Record<RequestStatus, string> = {
   PENDING: 'Submitted request',
   ASSIGNED: 'Assigned',
@@ -130,7 +134,7 @@ export class ServiceRequestsService {
       });
 
       return withCode;
-    });
+    }, TRANSACTION_OPTIONS);
 
     return this.toSummary(created);
   }
@@ -269,7 +273,7 @@ export class ServiceRequestsService {
       });
 
       return result;
-    });
+    }, TRANSACTION_OPTIONS);
 
     return this.toSummary(updated);
   }
@@ -306,7 +310,7 @@ export class ServiceRequestsService {
       });
 
       return result;
-    });
+    }, TRANSACTION_OPTIONS);
 
     return this.toSummary(updated);
   }
