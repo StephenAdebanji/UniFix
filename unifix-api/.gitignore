@@ -3,3 +3,7 @@ node_modules
 .env
 
 /generated/prisma
+
+# uploaded evidence files (local disk storage — ephemeral on most hosts)
+/uploads/*
+!/uploads/.gitkeep

@@ -7,6 +7,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReportsModule } from './reports/reports.module';
 import { ServiceRequestsModule } from './service-requests/service-requests.module';
+import { UploadsModule } from './uploads/uploads.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -20,6 +21,7 @@ import { UsersModule } from './users/users.module';
     CategoriesModule,
     ServiceRequestsModule,
     ReportsModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
