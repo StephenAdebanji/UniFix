@@ -62,7 +62,9 @@ export default function RegisterPage() {
           </p>
         </div>
         <p className="text-xs text-neutral-400">
-          © 2026 UniFix — MIT 8333 Continuous Assessment.
+          © 2026 UniFix — MIT 8333 Continuous Assessment By Stephen Adebanji
+          <br />
+          Matric Number: 2025/A/MIT/0334 · Student ID: 301815200
         </p>
       </div>
 

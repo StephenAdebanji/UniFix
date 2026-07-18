@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Footer } from "@/components/Footer";
 
 export default function Home() {
   return (
@@ -184,10 +185,7 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="flex items-center justify-between bg-navy px-8 py-5 text-xs text-neutral-400">
-        <span>© 2026 UniFix — University Maintenance Portal.</span>
-        <span>MIT 8333 — Advanced Web Application Development</span>
-      </footer>
+      <Footer />
     </div>
   );
 }

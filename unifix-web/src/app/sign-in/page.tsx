@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Spinner } from '@/components/Spinner';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
@@ -19,17 +20,23 @@ export default function SignInPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingAccount, setLoadingAccount] = useState<string | null>(null);
 
-  const doLogin = async (loginEmail: string, loginPassword: string) => {
+  const doLogin = async (
+    loginEmail: string,
+    loginPassword: string,
+    demoLabel?: string,
+  ) => {
     setError(null);
     setSubmitting(true);
+    if (demoLabel) setLoadingAccount(demoLabel);
     try {
       await login(loginEmail, loginPassword);
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
-    } finally {
       setSubmitting(false);
+      setLoadingAccount(null);
     }
   };
 
@@ -65,7 +72,9 @@ export default function SignInPage() {
           </p>
         </div>
         <p className="text-xs text-neutral-400">
-          © 2026 UniFix — MIT 8333 Continuous Assessment.
+          © 2026 UniFix — MIT 8333 Continuous Assessment By Stephen Adebanji
+          <br />
+          Matric Number: 2025/A/MIT/0334 · Student ID: 301815200
         </p>
       </div>
 
@@ -116,9 +125,12 @@ export default function SignInPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded bg-navy py-2.5 font-medium text-white hover:bg-navy-light disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded bg-navy py-2.5 font-medium text-white hover:bg-navy-light disabled:opacity-60"
             >
-              {submitting ? 'Signing in…' : 'Sign in'}
+              {submitting && !loadingAccount && (
+                <Spinner className="h-4 w-4 text-white" />
+              )}
+              {submitting && !loadingAccount ? 'Signing in…' : 'Sign in'}
             </button>
 
             <p className="text-center text-sm text-neutral-600">
@@ -134,17 +146,30 @@ export default function SignInPage() {
               DEMO ACCOUNTS
             </p>
             <div className="space-y-2">
-              {DEMO_ACCOUNTS.map((account) => (
-                <button
-                  key={account.email}
-                  type="button"
-                  onClick={() => doLogin(account.email, 'password123')}
-                  className="flex w-full items-center justify-between rounded border border-neutral-200 bg-white px-4 py-2.5 text-sm hover:border-gold"
-                >
-                  <span>{account.label}</span>
-                  <span className="text-neutral-400">Use →</span>
-                </button>
-              ))}
+              {DEMO_ACCOUNTS.map((account) => {
+                const isLoadingThis = loadingAccount === account.label;
+                return (
+                  <button
+                    key={account.email}
+                    type="button"
+                    disabled={submitting}
+                    onClick={() =>
+                      doLogin(account.email, 'password123', account.label)
+                    }
+                    className="flex w-full items-center justify-between rounded border border-neutral-200 bg-white px-4 py-2.5 text-sm hover:border-gold disabled:opacity-60"
+                  >
+                    <span>{account.label}</span>
+                    {isLoadingThis ? (
+                      <span className="flex items-center gap-2 text-navy">
+                        <Spinner className="h-4 w-4" />
+                        Signing in…
+                      </span>
+                    ) : (
+                      <span className="text-neutral-400">Use →</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { PriorityBadge, StatusBadge } from '@/components/Badge';
 import { RequireAuth } from '@/components/RequireAuth';
+import { Footer } from '@/components/Footer';
+import { LoadingScreen } from '@/components/Spinner';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type { PublicUser, RequestSummary } from '@/lib/types';
@@ -46,7 +48,7 @@ function DashboardContent() {
   }, [user?.role]);
 
   if (loading) {
-    return <div className="p-8 text-neutral-500">Loading…</div>;
+    return <LoadingScreen />;
   }
 
   const awaitingAction = requests.filter(
@@ -175,6 +177,7 @@ export default function DashboardPage() {
     <RequireAuth>
       <Navbar />
       <DashboardContent />
+      <Footer />
     </RequireAuth>
   );
 }

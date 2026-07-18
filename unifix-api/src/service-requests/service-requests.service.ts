@@ -183,14 +183,7 @@ export class ServiceRequestsService {
     };
   }
 
-  async findOne(user: AuthenticatedUser, id: number) {
-    await this.assertCanView(user, id);
-
-    const request = await this.prisma.serviceRequest.findUniqueOrThrow({
-      where: { id },
-      include: requestSummaryInclude,
-    });
-
+  private async buildActivity(id: number) {
     const [statusUpdates, assignments] = await Promise.all([
       this.prisma.statusUpdate.findMany({
         where: { requestId: id },
@@ -207,7 +200,7 @@ export class ServiceRequestsService {
       }),
     ]);
 
-    const activity = [
+    return [
       ...statusUpdates
         .filter((update) => update.newStatus !== RequestStatus.ASSIGNED)
         .map((update) => ({
@@ -225,6 +218,17 @@ export class ServiceRequestsService {
         at: assignment.assignedAt,
       })),
     ].sort((a, b) => a.at.getTime() - b.at.getTime());
+  }
+
+  async findOne(user: AuthenticatedUser, id: number) {
+    await this.assertCanView(user, id);
+
+    const request = await this.prisma.serviceRequest.findUniqueOrThrow({
+      where: { id },
+      include: requestSummaryInclude,
+    });
+
+    const activity = await this.buildActivity(id);
 
     return { ...this.toSummary(request), activity };
   }
@@ -275,7 +279,8 @@ export class ServiceRequestsService {
       return result;
     }, TRANSACTION_OPTIONS);
 
-    return this.toSummary(updated);
+    const activity = await this.buildActivity(id);
+    return { ...this.toSummary(updated), activity };
   }
 
   async updateStatus(
@@ -312,7 +317,8 @@ export class ServiceRequestsService {
       return result;
     }, TRANSACTION_OPTIONS);
 
-    return this.toSummary(updated);
+    const activity = await this.buildActivity(id);
+    return { ...this.toSummary(updated), activity };
   }
 
   async exportCsv(user: AuthenticatedUser) {

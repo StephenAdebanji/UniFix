@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { LoadingScreen } from '@/components/Spinner';
 import { useAuth } from '@/lib/auth-context';
 import type { RoleName } from '@/lib/types';
 
@@ -26,12 +27,16 @@ export function RequireAuth({
     }
   }, [loading, user, roles, router]);
 
-  if (loading || !user || (roles && !roles.includes(user.role))) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center text-neutral-500">
-        Loading…
-      </div>
-    );
+  // Still resolving the session on first load — show a spinner.
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  // No user, or wrong role — a redirect is already underway (see effect
+  // above). Render nothing rather than a spinner so sign-out and role
+  // redirects feel instant instead of flashing a loading state.
+  if (!user || (roles && !roles.includes(user.role))) {
+    return null;
   }
 
   return <>{children}</>;

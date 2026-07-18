@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { RequireAuth } from '@/components/RequireAuth';
+import { Footer } from '@/components/Footer';
+import { Spinner } from '@/components/Spinner';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type { PublicUser, RoleName } from '@/lib/types';
@@ -57,8 +59,8 @@ function UsersContent() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-6 py-10 text-center text-neutral-500">
-                  Loading…
+                <td colSpan={4} className="px-6 py-10 text-center">
+                  <Spinner className="mx-auto h-6 w-6" />
                 </td>
               </tr>
             ) : (
@@ -107,6 +109,7 @@ export default function UsersPage() {
     <RequireAuth roles={['ADMINISTRATOR']}>
       <Navbar />
       <UsersContent />
+      <Footer />
     </RequireAuth>
   );
 }

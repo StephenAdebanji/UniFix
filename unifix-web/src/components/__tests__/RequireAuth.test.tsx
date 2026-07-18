@@ -65,7 +65,7 @@ describe('RequireAuth', () => {
         <div>secret content</div>
       </RequireAuth>,
     );
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });
 });

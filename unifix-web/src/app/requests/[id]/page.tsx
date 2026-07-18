@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { PriorityBadge, StatusBadge } from '@/components/Badge';
 import { RequireAuth } from '@/components/RequireAuth';
+import { Footer } from '@/components/Footer';
+import { LoadingScreen } from '@/components/Spinner';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type { PublicUser, RequestDetail, RequestStatus } from '@/lib/types';
@@ -176,7 +178,7 @@ function RequestDetailContent() {
   }
 
   if (!request) {
-    return <div className="mx-auto max-w-3xl px-8 py-10 text-neutral-500">Loading…</div>;
+    return <LoadingScreen />;
   }
 
   const officerCanAct =
@@ -258,7 +260,7 @@ function RequestDetailContent() {
               ACTIVITY LOG
             </p>
             <div className="space-y-4">
-              {request.activity.map((event, i) => (
+              {(request.activity ?? []).map((event, i) => (
                 <div key={i} className="flex gap-3">
                   <div className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-gold" />
                   <div>
@@ -306,6 +308,7 @@ export default function RequestDetailPage() {
     <RequireAuth>
       <Navbar />
       <RequestDetailContent />
+      <Footer />
     </RequireAuth>
   );
 }

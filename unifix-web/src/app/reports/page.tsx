@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { RequireAuth } from '@/components/RequireAuth';
+import { Footer } from '@/components/Footer';
+import { LoadingScreen } from '@/components/Spinner';
 import { api } from '@/lib/api';
 import type { ReportsSummary } from '@/lib/types';
 
@@ -59,7 +61,7 @@ function ReportsContent() {
   };
 
   if (!summary) {
-    return <div className="mx-auto max-w-6xl px-8 py-10 text-neutral-500">Loading…</div>;
+    return <LoadingScreen />;
   }
 
   const statusMax = Math.max(1, ...Object.values(summary.byStatus));
@@ -154,6 +156,7 @@ export default function ReportsPage() {
     <RequireAuth roles={['ADMINISTRATOR']}>
       <Navbar />
       <ReportsContent />
+      <Footer />
     </RequireAuth>
   );
 }

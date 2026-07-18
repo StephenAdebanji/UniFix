@@ -42,6 +42,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // If the back/forward cache restores a previously-authenticated page after
+  // the user has logged out (tokens cleared), force a fresh navigation
+  // instead of showing the stale, logged-in snapshot.
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && !getAccessToken()) {
+        window.location.replace('/sign-in');
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.auth.login({ email, password });
     setTokens(res.accessToken, res.refreshToken);
@@ -65,13 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    try {
-      await api.auth.logout();
-    } catch {
-      // ignore — we're clearing local state regardless
-    }
+    // Clear local state immediately so the redirect feels instant — the
+    // server-side call to invalidate the refresh token happens in the
+    // background and its result doesn't affect the UI either way.
     clearTokens();
     setUser(null);
+    api.auth.logout().catch(() => {});
   }, []);
 
   return (

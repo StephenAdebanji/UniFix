@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { PriorityBadge, StatusBadge } from '@/components/Badge';
 import { RequireAuth } from '@/components/RequireAuth';
+import { Footer } from '@/components/Footer';
+import { Spinner } from '@/components/Spinner';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type { Category, RequestSummary, RequestStatus } from '@/lib/types';
@@ -146,8 +148,8 @@ function RequestsContent() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-10 text-center text-neutral-500">
-                  Loading…
+                <td colSpan={5} className="px-6 py-10 text-center">
+                  <Spinner className="mx-auto h-6 w-6" />
                 </td>
               </tr>
             ) : requests.length === 0 ? (
@@ -194,6 +196,7 @@ export default function RequestsPage() {
     <RequireAuth>
       <Navbar />
       <RequestsContent />
+      <Footer />
     </RequireAuth>
   );
 }

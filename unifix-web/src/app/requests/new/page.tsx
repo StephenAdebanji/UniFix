@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { RequireAuth } from '@/components/RequireAuth';
+import { Footer } from '@/components/Footer';
 import { api, ApiError } from '@/lib/api';
 import type { Category, RequestPriority } from '@/lib/types';
 
@@ -209,6 +210,7 @@ export default function NewRequestPage() {
     <RequireAuth roles={['STUDENT_STAFF']}>
       <Navbar />
       <NewRequestForm />
+      <Footer />
     </RequireAuth>
   );
 }
