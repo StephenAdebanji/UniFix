@@ -3,6 +3,7 @@ import type { RequestPriority, RequestStatus } from '@/lib/types';
 const STATUS_STYLES: Record<RequestStatus, string> = {
   PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
   ASSIGNED: 'bg-blue-50 text-blue-700 border-blue-200',
+  ACCEPTED: 'bg-blue-50 text-blue-700 border-blue-200',
   IN_PROGRESS: 'bg-blue-50 text-blue-700 border-blue-200',
   RESOLVED: 'bg-green-50 text-green-700 border-green-200',
   REJECTED: 'bg-neutral-100 text-neutral-500 border-neutral-200',
@@ -11,6 +12,7 @@ const STATUS_STYLES: Record<RequestStatus, string> = {
 const STATUS_LABEL: Record<RequestStatus, string> = {
   PENDING: 'Pending',
   ASSIGNED: 'Assigned',
+  ACCEPTED: 'Accepted',
   IN_PROGRESS: 'In Progress',
   RESOLVED: 'Resolved',
   REJECTED: 'Rejected',

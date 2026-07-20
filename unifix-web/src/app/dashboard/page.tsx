@@ -54,7 +54,9 @@ function DashboardContent() {
   const awaitingAction = requests.filter(
     (r) => r.status === 'PENDING' || r.status === 'ASSIGNED',
   ).length;
-  const inProgress = requests.filter((r) => r.status === 'IN_PROGRESS').length;
+  const inProgress = requests.filter(
+    (r) => r.status === 'ACCEPTED' || r.status === 'IN_PROGRESS',
+  ).length;
   const resolved = requests.filter((r) => r.status === 'RESOLVED').length;
 
   const recent = requests.slice(0, 5);

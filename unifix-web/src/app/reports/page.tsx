@@ -11,6 +11,7 @@ import type { ReportsSummary } from '@/lib/types';
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Pending',
   ASSIGNED: 'Assigned',
+  ACCEPTED: 'Accepted',
   IN_PROGRESS: 'In Progress',
   RESOLVED: 'Resolved',
   REJECTED: 'Rejected',

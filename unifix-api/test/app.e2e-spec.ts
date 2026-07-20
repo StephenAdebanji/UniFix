@@ -250,7 +250,66 @@ describe('UniFix API (e2e)', () => {
       expect(res.body.assignedTo.id).toBe(officerId);
     });
 
-    it('lets the assigned officer update the status', async () => {
+    it('rejects an invalid status transition (ASSIGNED -> RESOLVED)', async () => {
+      await request(app.getHttpServer())
+        .patch(`/requests/${requestId}/status`)
+        .set('Authorization', `Bearer ${officerToken}`)
+        .send({ status: 'RESOLVED' })
+        .expect(400);
+    });
+
+    it('lets the assigned officer accept the request', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/requests/${requestId}/status`)
+        .set('Authorization', `Bearer ${officerToken}`)
+        .send({ status: 'ACCEPTED' })
+        .expect(200);
+
+      expect(res.body.status).toBe('ACCEPTED');
+    });
+
+    it('rejects a duplicate click of the same transition (already in this status)', async () => {
+      await request(app.getHttpServer())
+        .patch(`/requests/${requestId}/status`)
+        .set('Authorization', `Bearer ${officerToken}`)
+        .send({ status: 'ACCEPTED' })
+        .expect(400);
+    });
+
+    it('only records one status_updates row after a rapid duplicate click', async () => {
+      const acceptedUpdates = await prisma.statusUpdate.findMany({
+        where: { requestId, newStatus: 'ACCEPTED' },
+      });
+      expect(acceptedUpdates).toHaveLength(1);
+    });
+
+    it('blocks two concurrent requests from both applying the same transition', async () => {
+      const [first, second] = await Promise.all([
+        request(app.getHttpServer())
+          .patch(`/requests/${requestId}/status`)
+          .set('Authorization', `Bearer ${officerToken}`)
+          .send({ status: 'IN_PROGRESS' }),
+        request(app.getHttpServer())
+          .patch(`/requests/${requestId}/status`)
+          .set('Authorization', `Bearer ${officerToken}`)
+          .send({ status: 'IN_PROGRESS' }),
+      ]);
+
+      const statuses = [first.status, second.status].sort();
+      // One succeeds (200); the other loses the race and gets either a 409
+      // (status changed under it) or a 400 (already in this status by the
+      // time it re-reads) depending on exact timing — never a silent
+      // duplicate success.
+      expect(statuses[0]).toBe(200);
+      expect([400, 409]).toContain(statuses[1]);
+
+      const inProgressUpdates = await prisma.statusUpdate.findMany({
+        where: { requestId, newStatus: 'IN_PROGRESS' },
+      });
+      expect(inProgressUpdates).toHaveLength(1);
+    });
+
+    it('lets the officer resolve the request', async () => {
       const res = await request(app.getHttpServer())
         .patch(`/requests/${requestId}/status`)
         .set('Authorization', `Bearer ${officerToken}`)
@@ -258,6 +317,14 @@ describe('UniFix API (e2e)', () => {
         .expect(200);
 
       expect(res.body.status).toBe('RESOLVED');
+    });
+
+    it('blocks any further transition on a terminal (RESOLVED) request', async () => {
+      await request(app.getHttpServer())
+        .patch(`/requests/${requestId}/status`)
+        .set('Authorization', `Bearer ${officerToken}`)
+        .send({ status: 'IN_PROGRESS' })
+        .expect(403);
     });
 
     it('returns a chronological activity log for the request', async () => {
@@ -272,8 +339,53 @@ describe('UniFix API (e2e)', () => {
       expect(labels).toEqual([
         'Submitted request',
         'Assigned to E2E Officer',
+        'Accepted',
+        'Marked in progress',
         'Resolved',
       ]);
+    });
+
+    describe('rejection flow', () => {
+      let rejectRequestId: number;
+
+      beforeAll(async () => {
+        const created = await request(app.getHttpServer())
+          .post('/requests')
+          .set('Authorization', `Bearer ${studentToken}`)
+          .send({
+            title: 'E2E leaking tap',
+            categoryId,
+            location: 'E2E Test Washroom',
+            description: 'The tap in the washroom will not stop dripping.',
+          })
+          .expect(201);
+        rejectRequestId = created.body.id;
+        createdRequestIds.push(rejectRequestId);
+
+        await request(app.getHttpServer())
+          .patch(`/requests/${rejectRequestId}/assign`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({ officerId })
+          .expect(200);
+      });
+
+      it('rejects a REJECTED status change without a reason', async () => {
+        await request(app.getHttpServer())
+          .patch(`/requests/${rejectRequestId}/status`)
+          .set('Authorization', `Bearer ${officerToken}`)
+          .send({ status: 'REJECTED' })
+          .expect(400);
+      });
+
+      it('accepts a REJECTED status change with a reason', async () => {
+        const res = await request(app.getHttpServer())
+          .patch(`/requests/${rejectRequestId}/status`)
+          .set('Authorization', `Bearer ${officerToken}`)
+          .send({ status: 'REJECTED', note: 'Not a real fault, tap works fine' })
+          .expect(200);
+
+        expect(res.body.status).toBe('REJECTED');
+      });
     });
   });
 });

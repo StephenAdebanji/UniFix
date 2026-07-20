@@ -3,6 +3,7 @@ import { IsIn, IsOptional, IsString } from 'class-validator';
 import { RequestStatus } from '../../../generated/prisma/enums';
 
 const MANUAL_STATUSES = [
+  RequestStatus.ACCEPTED,
   RequestStatus.IN_PROGRESS,
   RequestStatus.RESOLVED,
   RequestStatus.REJECTED,

@@ -1,27 +1,40 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { PriorityBadge, StatusBadge } from '@/components/Badge';
 import { RequireAuth } from '@/components/RequireAuth';
 import { Footer } from '@/components/Footer';
-import { LoadingScreen } from '@/components/Spinner';
+import { LoadingScreen, Spinner } from '@/components/Spinner';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import {
+  ALLOWED_TRANSITIONS,
+  isTerminal,
+  STATUS_ACTION_LABEL,
+} from '@/lib/status-transitions';
 import type { PublicUser, RequestDetail, RequestStatus } from '@/lib/types';
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('en-GB');
 }
 
+const ACTION_BUTTON_STYLE: Partial<Record<RequestStatus, string>> = {
+  ACCEPTED: 'bg-navy hover:bg-navy-light',
+  IN_PROGRESS: 'bg-navy hover:bg-navy-light',
+  RESOLVED: 'bg-green-700 hover:bg-green-800',
+  REJECTED: 'bg-red-700 hover:bg-red-800',
+};
+
 function AssignPanel({
   request,
   onAssigned,
+  onConflict,
 }: {
   request: RequestDetail;
   onAssigned: (r: RequestDetail) => void;
+  onConflict: () => void;
 }) {
   const [officers, setOfficers] = useState<PublicUser[]>([]);
   const [officerId, setOfficerId] = useState('');
@@ -42,7 +55,11 @@ function AssignPanel({
       const updated = await api.requests.assign(request.id, Number(officerId));
       onAssigned(updated);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong');
+      if (err instanceof ApiError && (err.status === 400 || err.status === 409)) {
+        onConflict();
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Something went wrong');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -54,7 +71,8 @@ function AssignPanel({
       <select
         value={officerId}
         onChange={(e) => setOfficerId(e.target.value)}
-        className="mt-3 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+        disabled={submitting}
+        className="mt-3 w-full rounded border border-neutral-300 px-3 py-2 text-sm disabled:opacity-60"
       >
         <option value="">Select an officer</option>
         {officers.map((o) => (
@@ -68,8 +86,9 @@ function AssignPanel({
       <button
         onClick={handleAssign}
         disabled={submitting || !officerId}
-        className="mt-3 w-full rounded bg-navy py-2.5 text-sm font-medium text-white hover:bg-navy-light disabled:opacity-60"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded bg-navy py-2.5 text-sm font-medium text-white hover:bg-navy-light disabled:opacity-60"
       >
+        {submitting && <Spinner className="h-4 w-4 text-white" />}
         {submitting ? 'Assigning…' : 'Assign'}
       </button>
     </div>
@@ -79,72 +98,78 @@ function AssignPanel({
 function UpdateStatusPanel({
   request,
   onUpdated,
+  onConflict,
 }: {
   request: RequestDetail;
   onUpdated: (r: RequestDetail) => void;
+  onConflict: () => void;
 }) {
-  const nextStatus: RequestStatus =
-    request.status === 'ASSIGNED' ? 'IN_PROGRESS' : 'RESOLVED';
-  const [status, setStatus] = useState<RequestStatus>(nextStatus);
   const [note, setNote] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingStatus, setSubmittingStatus] = useState<RequestStatus | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
-  const actionLabel =
-    status === 'IN_PROGRESS'
-      ? 'Mark In Progress'
-      : status === 'RESOLVED'
-        ? 'Resolve'
-        : 'Reject';
+  const actions = ALLOWED_TRANSITIONS[request.status];
 
-  const handleUpdate = async () => {
-    setSubmitting(true);
+  const handleAction = async (target: RequestStatus) => {
+    if (target === 'REJECTED' && !note.trim()) {
+      setError('A reason is required to reject a request');
+      return;
+    }
+    setSubmittingStatus(target);
     setError(null);
     try {
       const updated = await api.requests.updateStatus(
         request.id,
-        status,
+        target,
         note || undefined,
       );
       onUpdated(updated);
       setNote('');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong');
+      if (err instanceof ApiError && (err.status === 400 || err.status === 409)) {
+        onConflict();
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Something went wrong');
+      }
     } finally {
-      setSubmitting(false);
+      setSubmittingStatus(null);
     }
   };
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-6">
       <p className="text-xs tracking-widest text-gold">UPDATE STATUS</p>
-      <select
-        value={status}
-        onChange={(e) => setStatus(e.target.value as RequestStatus)}
-        className="mt-3 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
-      >
-        <option value="IN_PROGRESS">Mark in progress</option>
-        <option value="RESOLVED">Resolve</option>
-        <option value="REJECTED">Reject</option>
-      </select>
       <label className="mt-3 block text-sm font-medium text-navy">
-        Note (optional)
+        {actions.includes('REJECTED') ? 'Note (required to reject)' : 'Note (optional)'}
       </label>
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
+        disabled={submittingStatus !== null}
         placeholder="Add context for the log…"
         rows={3}
-        className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-gold focus:outline-none"
+        className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-gold focus:outline-none disabled:opacity-60"
       />
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      <button
-        onClick={handleUpdate}
-        disabled={submitting}
-        className="mt-3 w-full rounded bg-green-700 py-2.5 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-60"
-      >
-        {submitting ? 'Saving…' : actionLabel}
-      </button>
+      <div className="mt-3 space-y-2">
+        {actions.map((target) => (
+          <button
+            key={target}
+            onClick={() => handleAction(target)}
+            disabled={submittingStatus !== null}
+            className={`flex w-full items-center justify-center gap-2 rounded py-2.5 text-sm font-medium text-white disabled:opacity-60 ${ACTION_BUTTON_STYLE[target] ?? 'bg-navy hover:bg-navy-light'}`}
+          >
+            {submittingStatus === target && (
+              <Spinner className="h-4 w-4 text-white" />
+            )}
+            {submittingStatus === target
+              ? 'Saving…'
+              : STATUS_ACTION_LABEL[target]}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -156,6 +181,7 @@ function RequestDetailContent() {
   const id = Number(params.id);
   const [request, setRequest] = useState<RequestDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
 
   const load = () => {
     api.requests
@@ -168,6 +194,11 @@ function RequestDetailContent() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const handleConflict = () => {
+    setBanner('This request was already updated — showing the latest state.');
+    load();
+  };
 
   if (notFound) {
     return (
@@ -184,7 +215,7 @@ function RequestDetailContent() {
   const officerCanAct =
     user?.role === 'MAINTENANCE_OFFICER' &&
     request.assignedTo?.id === user.id &&
-    (request.status === 'ASSIGNED' || request.status === 'IN_PROGRESS');
+    !isTerminal(request.status);
 
   const adminCanAssign = user?.role === 'ADMINISTRATOR';
 
@@ -196,6 +227,18 @@ function RequestDetailContent() {
       >
         ← Back to requests
       </button>
+
+      {banner && (
+        <div className="mb-6 flex items-center justify-between rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>{banner}</span>
+          <button
+            onClick={() => setBanner(null)}
+            className="ml-4 text-amber-700 hover:text-amber-900"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <span className="text-sm text-neutral-500">{request.code}</span>
@@ -282,10 +325,18 @@ function RequestDetailContent() {
 
         <div className="space-y-6">
           {officerCanAct && (
-            <UpdateStatusPanel request={request} onUpdated={setRequest} />
+            <UpdateStatusPanel
+              request={request}
+              onUpdated={setRequest}
+              onConflict={handleConflict}
+            />
           )}
           {adminCanAssign && !request.assignedTo && (
-            <AssignPanel request={request} onAssigned={setRequest} />
+            <AssignPanel
+              request={request}
+              onAssigned={setRequest}
+              onConflict={handleConflict}
+            />
           )}
 
           <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-6">

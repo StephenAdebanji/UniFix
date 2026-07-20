@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -16,6 +17,7 @@ import { CreateServiceRequestDto } from './dto/create-service-request.dto';
 import { QueryServiceRequestsDto } from './dto/query-service-requests.dto';
 import { AssignRequestDto } from './dto/assign-request.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
+import { ALLOWED_TRANSITIONS, isTerminal } from './status-transitions';
 
 // Neon's serverless compute can cold-start mid-transaction; the Prisma
 // default (5s) interactive-transaction timeout is too tight for that.
@@ -24,6 +26,7 @@ const TRANSACTION_OPTIONS = { timeout: 15000 };
 const STATUS_LABELS: Record<RequestStatus, string> = {
   PENDING: 'Submitted request',
   ASSIGNED: 'Assigned',
+  ACCEPTED: 'Accepted',
   IN_PROGRESS: 'Marked in progress',
   RESOLVED: 'Resolved',
   REJECTED: 'Rejected',
@@ -234,13 +237,6 @@ export class ServiceRequestsService {
   }
 
   async assign(user: AuthenticatedUser, id: number, dto: AssignRequestDto) {
-    const request = await this.prisma.serviceRequest.findUnique({
-      where: { id },
-    });
-    if (!request) {
-      throw new NotFoundException('Service request not found');
-    }
-
     const officer = await this.prisma.user.findUnique({
       where: { id: dto.officerId },
       include: { role: true },
@@ -249,15 +245,37 @@ export class ServiceRequestsService {
       throw new BadRequestException('Target user is not a maintenance officer');
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.serviceRequest.update({
+    await this.prisma.$transaction(async (tx) => {
+      const request = await tx.serviceRequest.findUniqueOrThrow({
         where: { id },
+      });
+
+      if (isTerminal(request.status)) {
+        throw new ForbiddenException(
+          'This request is closed and cannot be modified',
+        );
+      }
+      if (!ALLOWED_TRANSITIONS[request.status].includes(RequestStatus.ASSIGNED)) {
+        throw new BadRequestException(
+          'This request cannot be assigned in its current status',
+        );
+      }
+
+      // Only succeeds if the row is still in the status we just read — a
+      // concurrent assign/status-change between our read and this write
+      // makes count 0, so we throw instead of silently double-logging.
+      const result = await tx.serviceRequest.updateMany({
+        where: { id, status: request.status },
         data: {
           currentAssigneeId: officer.id,
           status: RequestStatus.ASSIGNED,
         },
-        include: requestSummaryInclude,
       });
+      if (result.count === 0) {
+        throw new ConflictException(
+          'Request status was changed by another action, please refresh',
+        );
+      }
 
       await tx.assignment.create({
         data: {
@@ -275,11 +293,15 @@ export class ServiceRequestsService {
           newStatus: RequestStatus.ASSIGNED,
         },
       });
-
-      return result;
     }, TRANSACTION_OPTIONS);
 
-    const activity = await this.buildActivity(id);
+    const [updated, activity] = await Promise.all([
+      this.prisma.serviceRequest.findUniqueOrThrow({
+        where: { id },
+        include: requestSummaryInclude,
+      }),
+      this.buildActivity(id),
+    ]);
     return { ...this.toSummary(updated), activity };
   }
 
@@ -288,21 +310,49 @@ export class ServiceRequestsService {
     id: number,
     dto: UpdateStatusDto,
   ) {
-    const request = await this.assertCanView(user, id);
-
     if (
-      user.role === RoleName.MAINTENANCE_OFFICER &&
-      request.currentAssigneeId !== user.userId
+      dto.status === RequestStatus.REJECTED &&
+      !dto.note?.trim()
     ) {
-      throw new ForbiddenException('This request is not assigned to you');
+      throw new BadRequestException('A reason is required to reject a request');
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.serviceRequest.update({
-        where: { id },
+    await this.prisma.$transaction(async (tx) => {
+      const request = await tx.serviceRequest.findUnique({ where: { id } });
+      if (!request) {
+        throw new NotFoundException('Service request not found');
+      }
+      if (
+        user.role === RoleName.MAINTENANCE_OFFICER &&
+        request.currentAssigneeId !== user.userId
+      ) {
+        throw new ForbiddenException('This request is not assigned to you');
+      }
+
+      if (isTerminal(request.status)) {
+        throw new ForbiddenException(
+          'This request is closed and cannot be modified',
+        );
+      }
+      if (request.status === dto.status) {
+        throw new BadRequestException('Request is already in this status');
+      }
+      if (!ALLOWED_TRANSITIONS[request.status].includes(dto.status)) {
+        throw new BadRequestException('Invalid status transition');
+      }
+
+      // Only succeeds if the row is still in the status we just read — a
+      // duplicate click that already slipped a status change through makes
+      // count 0 here, so we throw instead of silently double-logging.
+      const result = await tx.serviceRequest.updateMany({
+        where: { id, status: request.status },
         data: { status: dto.status },
-        include: requestSummaryInclude,
       });
+      if (result.count === 0) {
+        throw new ConflictException(
+          'Request status was changed by another action, please refresh',
+        );
+      }
 
       await tx.statusUpdate.create({
         data: {
@@ -313,11 +363,15 @@ export class ServiceRequestsService {
           note: dto.note,
         },
       });
-
-      return result;
     }, TRANSACTION_OPTIONS);
 
-    const activity = await this.buildActivity(id);
+    const [updated, activity] = await Promise.all([
+      this.prisma.serviceRequest.findUniqueOrThrow({
+        where: { id },
+        include: requestSummaryInclude,
+      }),
+      this.buildActivity(id),
+    ]);
     return { ...this.toSummary(updated), activity };
   }
 

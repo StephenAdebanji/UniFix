@@ -3,6 +3,7 @@ export type RoleName = 'STUDENT_STAFF' | 'MAINTENANCE_OFFICER' | 'ADMINISTRATOR'
 export type RequestStatus =
   | 'PENDING'
   | 'ASSIGNED'
+  | 'ACCEPTED'
   | 'IN_PROGRESS'
   | 'RESOLVED'
   | 'REJECTED';

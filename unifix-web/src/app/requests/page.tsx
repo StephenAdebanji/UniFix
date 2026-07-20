@@ -15,6 +15,7 @@ const STATUS_OPTIONS: { value: RequestStatus | ''; label: string }[] = [
   { value: '', label: 'All statuses' },
   { value: 'PENDING', label: 'Pending' },
   { value: 'ASSIGNED', label: 'Assigned' },
+  { value: 'ACCEPTED', label: 'Accepted' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'RESOLVED', label: 'Resolved' },
   { value: 'REJECTED', label: 'Rejected' },

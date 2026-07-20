@@ -20,6 +20,7 @@ enum RoleName {
 enum RequestStatus {
   PENDING
   ASSIGNED
+  ACCEPTED
   IN_PROGRESS
   RESOLVED
   REJECTED
